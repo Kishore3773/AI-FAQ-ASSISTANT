@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI FAQ Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="auth-section">
+    <h2>Login</h2>
+
+    <input type="email" id="loginEmail" placeholder="Enter email">
+
+    <input type="password" id="loginPassword" placeholder="Enter password">
+
+    <button onclick="loginUser()">Login</button>
+
+    <p id="loginMessage"></p>
+</div>
+
+
+<h1>🤖 AI FAQ Assistant</h1>
+<p class="subtitle">Ask questions and get instant answers from our FAQ knowledge base.</p>
+<p class="welcome">Welcome! Ask a question and I'll find the most relevant answer from the FAQ database.</p>
+
+<p>Ask a question to find the answer.</p>
+<h2>AI FAQ Generator</h2>
+
+<p class="section-description">
+    Enter a topic and let Gemini generate an FAQ.
+</p>
+
+<input type="text" id="aiTopicInput" placeholder="Enter a topic...">
+
+<button onclick="generateAIFAQ()">Generate FAQ</button>
+
+<div id="aiResult"></div>
+
+<h2>Add a New FAQ</h2>
+<p class="section-description">
+    Add a question and answer to the FAQ database.
+</p>
+
+<input type="text" id="questionInput" placeholder="Enter your question...">
+
+<input type="text" id="answerInput" placeholder="Enter the answer...">
+<button onclick="addFAQ()">Add FAQ</button>
+
+<div id="addResult"></div>
+
+<h2>Search FAQ</h2>
+
+<input type="text" id="searchInput" placeholder="Ask your question here...">
+
+<button onclick="searchFAQ()">Search</button>
+<button onclick="document.getElementById('searchInput').value=''; document.getElementById('result').innerHTML=''">Clear</button>
+
+<div id="result"></div>
+
+<h2>All FAQs</h2>
+<p class="section-description">
+    View, edit, or delete saved FAQs from the database.
+</p>
+
+<div id="faqList"></div>
+
+<button onclick="loadFAQs()">🔄 Load All FAQs</button>
+
+<script>
+    async function generateAIFAQ() {
+    const topic = document.getElementById("aiTopicInput").value;
+
+    if (topic.trim() === "") {
+        alert("Please enter a topic.");
+        return;
+    }
+
+    const aiResult = document.getElementById("aiResult");
+    aiResult.innerHTML = "<p>Generating FAQ...</p>";
+
+    try {
+        const response = await fetch("/api/ai/generate-faq", {
+            method: "POST",
+            headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " + localStorage.getItem("token")
+},
+            body: JSON.stringify({
+                topic: topic
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            aiResult.innerHTML = `<p>${data.message}</p>`;
+            return;
+        }
+
+        aiResult.innerHTML = `
+            <div>
+                <h3>AI Generated FAQ</h3>
+                <p>${data.faq.answer}</p>
+            </div>
+        `;
+
+    } catch (error) {
+        aiResult.innerHTML = "<p>Failed to connect to AI.</p>";
+        console.error(error);
+    }
+}
+
+    // SEARCH FAQ
+    async function searchFAQ() {
+
+        const query = document.getElementById("searchInput").value;
+
+        const response = await fetch(
+            `/api/faqs/search?q=${encodeURIComponent(query)}`
+        );
+
+        const faqs = await response.json();
+
+        const result = document.getElementById("result");
+        result.innerHTML = "<p>Searching...</p>";
+
+        if (faqs.length === 0) {
+            result.innerHTML = "<p>No FAQ found.</p>";
+            return;
+        }
+
+        result.innerHTML = faqs.map(faq => `
+            <div>
+                <h3>${faq.question}</h3>
+                <p>${faq.answer}</p>
+            </div>
+        `).join("");
+    }
+
+
+    // ADD FAQ
+    async function addFAQ() {
+
+        const question =
+            document.getElementById("questionInput").value;
+
+        const answer =
+            document.getElementById("answerInput").value;
+
+        if (question.trim() === "" || answer.trim() === "") {
+            alert("Please enter both question and answer.");
+            return;
+        }
+
+        const response = await fetch("/api/faqs", {
+            method: "POST",
+
+headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " + localStorage.getItem("token")
+},
+            body: JSON.stringify({
+                question: question,
+                answer: answer
+            })
+        });
+
+        const result = await response.json();
+
+        document.getElementById("addResult").innerHTML =
+            `<p>${result.message || "FAQ added successfully!"}</p>`;
+
+        document.getElementById("questionInput").value = "";
+        document.getElementById("answerInput").value = "";
+       
+
+        loadFAQs();
+    }
+
+
+    // LOAD ALL FAQs
+    async function loadFAQs() {
+
+        const response = await fetch("/api/faqs/all");
+
+        const faqs = await response.json();
+
+        const faqList = document.getElementById("faqList");
+
+        faqList.innerHTML = faqs.map(faq => `
+            <div>
+                <h3>${faq.question}</h3>
+                <p>${faq.answer}</p>
+
+                <button onclick="editFAQ('${faq._id}')">
+                    Edit
+                </button>
+
+                <button onclick="deleteFAQ('${faq._id}')">
+                    Delete
+                </button>
+            </div>
+        `).join("");
+    }
+
+
+    // DELETE FAQ
+    async function deleteFAQ(id) {
+
+        const response = await fetch(`/api/faqs/${id}`, {
+    method: "DELETE",
+    headers: {
+        "Authorization": "Bearer " + localStorage.getItem("token")
+    }
+});
+
+        const result = await response.json();
+
+        alert(result.message);
+
+        loadFAQs();
+    }
+
+
+    // EDIT FAQ
+    async function editFAQ(id) {
+
+        const question = prompt("Enter new question:");
+
+        if (question === null) {
+            return;
+        }
+
+        const answer = prompt("Enter new answer:");
+
+        if (answer === null) {
+            return;
+        }
+
+        if (question.trim() === "" || answer.trim() === "") {
+            alert("Question and answer cannot be empty.");
+            return;
+        }
+
+        const response = await fetch(`/api/faqs/${id}`, {
+            method: "PUT",
+            headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " + localStorage.getItem("token")
+},
+            body: JSON.stringify({
+                question: question,
+                answer: answer
+            })
+        });
+
+        const result = await response.json();
+
+        alert(result.message || "FAQ updated successfully");
+
+        loadFAQs();
+    }
+
+
+    loadFAQs();
+    async function loginUser() {
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
+    const loginMessage = document.getElementById("loginMessage");
+
+    try {
+        const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                email: email,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            loginMessage.textContent = data.message;
+            return;
+        }
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        loginMessage.textContent = "Login successful!";
+    } catch (error) {
+        loginMessage.textContent = "Login failed.";
+        console.error(error);
+    }
+}
+
+</script>
+<footer>
+    AI FAQ Assistant | FAQ Management System
+</footer>
+
+
+</body>
+
+</html>
