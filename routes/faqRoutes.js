@@ -2,9 +2,8 @@ const express = require("express");
 const FAQ = require("../models/FAQ");
 const protect = require("../middleware/authMiddleware");
 const roleCheck = require("../middleware/roleMiddleware");
+
 const router = express.Router();
-
-
 
 // TEST API
 router.get("/", (req, res) => {
@@ -12,7 +11,6 @@ router.get("/", (req, res) => {
         message: "FAQ API is working"
     });
 });
-
 
 // ADD FAQ
 router.post("/", protect, roleCheck("admin", "creator"), async (req, res) => {
@@ -26,11 +24,11 @@ router.post("/", protect, roleCheck("admin", "creator"), async (req, res) => {
         }
 
         const newFAQ = new FAQ({
-    question: question.trim(),
-    answer: answer.trim(),
-    createdBy: req.user.id,
-    category: category || null
-});
+            question: question.trim(),
+            answer: answer.trim(),
+            createdBy: req.user.id,
+            category: category || null
+        });
 
         const savedFAQ = await newFAQ.save();
 
@@ -49,12 +47,10 @@ router.post("/", protect, roleCheck("admin", "creator"), async (req, res) => {
     }
 });
 
-
 // GET ALL FAQs
 router.get("/all", async (req, res) => {
     try {
         const faqs = await FAQ.find();
-        console.log("ALL FAQS:", faqs);
 
         res.json(faqs);
 
@@ -62,52 +58,56 @@ router.get("/all", async (req, res) => {
         console.error("Get FAQs error:", error);
 
         res.status(500).json({
-            message: "Failed to fetch FAQs",
-            error: error.message
+            message: "Failed to fetch FAQs"
         });
     }
 });
 
-
-// SEARCH FAQs
+// SEMANTIC SEARCH FAQs
 router.get("/search", async (req, res) => {
-    console.log("NEW SEARCH ROUTE IS RUNNING");
     try {
         const q = req.query.q;
-        
 
         if (!q || q.trim() === "") {
             return res.json([]);
         }
 
-        const searchText = q.trim().toLowerCase();
-
-        const faqs = await FAQ.find();
-        
-
-
-        const results = faqs.filter(faq => {
-            const question = String(faq.question || "").toLowerCase();
-            const answer = String(faq.answer || "").toLowerCase();
-
-            return (
-                question.includes(searchText) ||
-                answer.includes(searchText)
-            );
-        });
+        const results = await FAQ.aggregate([
+            {
+                $vectorSearch: {
+                    index: "autoembed_index",
+                    path: "question",
+                    query: {
+                        text: q.trim()
+                    },
+                    numCandidates: 100,
+                    limit: 10
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    question: 1,
+                    answer: 1,
+                    category: 1,
+                    createdBy: 1,
+                    score: {
+                        $meta: "vectorSearchScore"
+                    }
+                }
+            }
+        ]);
 
         res.json(results);
 
     } catch (error) {
-        console.error("Search error:", error);
+        console.error("Semantic search error:", error);
 
         res.status(500).json({
-            message: "Search failed",
-            error: error.message
+            message: "Semantic search failed"
         });
     }
 });
-
 
 // DELETE FAQ
 router.delete("/:id", protect, roleCheck("admin", "creator"), async (req, res) => {
@@ -129,12 +129,10 @@ router.delete("/:id", protect, roleCheck("admin", "creator"), async (req, res) =
         console.error("Delete FAQ error:", error);
 
         res.status(500).json({
-            message: "Failed to delete FAQ",
-            error: error.message
+            message: "Failed to delete FAQ"
         });
     }
 });
-
 
 // EDIT FAQ
 router.put("/:id", protect, roleCheck("admin", "creator"), async (req, res) => {
@@ -173,11 +171,9 @@ router.put("/:id", protect, roleCheck("admin", "creator"), async (req, res) => {
         console.error("Update FAQ error:", error);
 
         res.status(500).json({
-            message: "Failed to update FAQ",
-            error: error.message
+            message: "Failed to update FAQ"
         });
     }
 });
-
 
 module.exports = router;
