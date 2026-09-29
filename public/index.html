@@ -10,6 +10,8 @@
 </head>
 
 <body>
+    
+    <button onclick="logoutUser()">Logout</button>
     <div class="auth-section">
     <h2>Login</h2>
 
@@ -299,6 +301,14 @@ headers: {
         loginMessage.textContent = "Login failed.";
         console.error(error);
     }
+}
+function logoutUser() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    alert("Logged out successfully!");
+
+    location.reload();
 }
 
 </script>

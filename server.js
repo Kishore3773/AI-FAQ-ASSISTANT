@@ -33,9 +33,10 @@ app.get("/", (req, res) => {
     res.sendFile(__dirname + "/public/index.html");
 });
 
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
 app.get("/api/ai/test", async (req, res) => {
     try {
+        console.log("Gemini API key loaded:", !!process.env.GEMINI_API_KEY);
         const response = await ai.models.generateContent({
             model: "gemini-3.8-flash",
             contents: "Say hello in one short sentence."
